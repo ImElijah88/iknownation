@@ -1,0 +1,139 @@
+/*
+ * Now Nation - Global Stylesheet
+ * --------------------------------
+ * This file contains the primary styles for the application, inspired by
+ * the reference file `nownation1.php`.
+ */
+
+/*
+ * 1. CSS Variables (Theming)
+ * ---------------------------
+ * We define the primary color palette here. These can be overridden by
+ * JavaScript for presentation-specific themes.
+ */
+:root {
+    --primary-color: #06b6d4; /* Default: cyan-600 */
+    --primary-color-light: #67e8f9; /* Default: cyan-400 */
+    --primary-color-hover: #0891b2; /* Default: cyan-500 */
+}
+
+/*
+ * 2. Body & Background
+ * --------------------
+ * The animated gradient background provides a modern, dynamic feel.
+ * It transitions smoothly between light and dark modes.
+ */
+@keyframes gradient-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+body {
+    font-family: "Inter", sans-serif;
+    background-size: 400% 400%;
+    animation: gradient-flow 15s ease infinite;
+    transition: background-image 0.5s ease-in-out;
+}
+
+/* Light Theme Gradient */
+body {
+    background-image: linear-gradient(
+        -45deg,
+        #e0c3fc, /* Light purple */
+        #8ec5fc, /* Light blue */
+        #f0f2f5, /* Off-white */
+        #a8edea  /* Light teal */
+    );
+}
+
+/* Dark Theme Gradient */
+.dark body {
+    background-image: linear-gradient(
+        -45deg,
+        #0f2027, /* Dark blue-gray */
+        #203a43, /* Dark teal */
+        #2c5364, /* Deeper blue */
+        #232526  /* Near black */
+    );
+}
+
+/*
+ * 3. Core Component Styles
+ * ------------------------
+ * These styles control the layout and behavior of major UI elements
+ * like presentations and sidebars.
+ */
+
+.sidebar-actions {
+    display: none;
+}
+
+.sidebar-item.active .sidebar-actions {
+    display: flex;
+}
+
+.sidebar-item .sidebar-text-container {
+    max-width: 0;
+    transition: max-width 0.4s ease-in-out, padding-left 0.4s ease-in-out;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+#sidebar.open .sidebar-item .sidebar-text-container,
+.sidebar-item.active .sidebar-text-container {
+    max-width: 250px; /* The maximum width the text can expand to */
+    padding-left: 0.75rem; /* Corresponds to ml-3 in Tailwind */
+}
+
+.presentation-container {
+    display: none;
+}
+
+.presentation-container.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.slide {
+    display: none;
+}
+
+.slide.active {
+    display: block;
+}
+
+/*
+ * 4. Notification Style
+ * ---------------------
+ * For providing user feedback (e.g., login success/error).
+ */
+#notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    color: white;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+}
+
+#notification.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+#notification.success {
+    background-color: #10B981; /* Tailwind Emerald-500 */
+}
+
+#notification.error {
+    background-color: #EF4444; /* Tailwind Red-500 */
+}

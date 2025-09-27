@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Unified Workflow Diagram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f7f7f7;
+        padding: 2rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+      .container {
+        width: 100%;
+        height: 80vh;
+        max-width: 1200px;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: auto; /* Changed to auto for both scroll directions */
+      }
+      canvas {
+        width: 5000px;
+        height: 3000px; /* Increased height to accommodate vertical layout */
+        transform-origin: 0 0;
+        cursor: grab;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100">
+    <div class="container rounded-xl shadow-lg">
+      <canvas id="workflowCanvas"></canvas>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("workflowCanvas");
+      const ctx = canvas.getContext("2d");
+      let scale = 1.0;
+      let isDragging = false;
+      let draggedNode = null;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      // Node definitions and their initial positions
+      const nodes = [
+        // Master Personal Assistant (MPA) Flow
+        {
+          id: "scheduleTriggerMPA",
+          name: "Schedule Trigger",
+          type: "trigger",
+          x: 50,
+          y: 100,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "telegramTriggerMPA",
+          name: "Telegram Trigger",
+          type: "trigger",
+          x: 50,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "masterAssistant",
+          name: "Master Personal Assistant",
+          type: "agent",
+          x: 250,
+          y: 150,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "getemail",
+          name: "Get Email",
+          type: "tool",
+          x: 500,
+          y: 50,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "googlecalendar",
+          name: "Google Calendar",
+          type: "tool",
+          x: 500,
+          y: 120,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "transcribeAudio",
+          name: "Transcribe audio",
+          type: "tool",
+          x: 500,
+          y: 190,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "startFactory",
+          name: "Start Factory Workflow",
+          type: "tool",
+          x: 500,
+          y: 260,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "replyTelegram",
+          name: "Reply in Telegram",
+          type: "output",
+          x: 700,
+          y: 150,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "slack",
+          name: "Slack",
+          type: "output",
+          x: 700,
+          y: 250,
+          width: 120,
+          height: 50,
+        },
+
+        // Factory Workflow - Trigger and core agents
+        {
+          id: "scheduleTriggerFactory",
+          name: "Schedule Trigger",
+          type: "trigger",
+          x: 900,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "mcpTrigger",
+          name: "MCP Server Trigger",
+          type: "trigger",
+          x: 900,
+          y: 150,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "projectArchitect",
+          name: "Project Architect Agent",
+          type: "agent",
+          x: 1100,
+          y: 100,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "designerAgent",
+          name: "Designer Agent",
+          type: "agent",
+          x: 1100,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "manAtWork",
+          name: "man_at_work",
+          type: "agent",
+          x: 1100,
+          y: 300,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "qaProtocol",
+          name: "QA_PROTOCOL",
+          type: "agent",
+          x: 1100,
+          y: 400,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "debuggingProtocol",
+          name: "DEBUGGING_PROTOCOL",
+          type: "agent",
+          x: 1100,
+          y: 500,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "deploymentProtocol",
+          name: "DEPLOYMENT_PROTOCOL",
+          type: "agent",
+          x: 1100,
+          y: 600,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "humanHandoff",
+          name: "HUMAN_ASSISTANCE_REQUIRED",
+          type: "tool",
+          x: 1350,
+          y: 500,
+          width: 250,
+          height: 50,
+        },
+        {
+          id: "resultsVerification",
+          name: "RESULTS_VERIFICATION",
+          type: "tool",
+          x: 1350,
+          y: 400,
+          width: 200,
+          height: 50,
+        },
+
+        // The Original Factory Agents as Sub-Agents
+        {
+          id: "superAgentManager",
+          name: "Super Agent manager",
+          type: "agent",
+          x: 1500,
+          y: 100,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "interpreter",
+          name: "interpreter",
+          type: "agent",
+          x: 1500,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "qualityControl",
+          name: "Quality Control Agent",
+          type: "agent",
+          x: 1500,
+          y: 300,
+          width: 200,
+          height: 50,
+        },
+
+        // Universal Toolkit
+        {
+          id: "gitHubTool",
+          name: "GitHub Tool",
+          type: "tool",
+          x: 1750,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "dockerTool",
+          name: "Docker Tool",
+          type: "tool",
+          x: 1750,
+          y: 120,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "postgresTool",
+          name: "Postgres Tool",
+          type: "tool",
+          x: 1750,
+          y: 190,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "supabasTool",
+          name: "Supabase/Firebase Auth",
+          type: "tool",
+          x: 1750,
+          y: 260,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "codeExecutionTool",
+          name: "Code Execution Tool",
+          type: "tool",
+          x: 1750,
+          y: 330,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "trelloAsanaTool",
+          name: "Trello/Asana Tool",
+          type: "tool",
+          x: 1750,
+          y: 400,
+          width: 170,
+          height: 50,
+        },
+
+        // Other Factory Tools and Components
+        {
+          id: "simpleMemory",
+          name: "Simple Memory",
+          type: "tool",
+          x: 1950,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "ollamaChatModel",
+          name: "Ollama Chat Model",
+          type: "tool",
+          x: 1950,
+          y: 120,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "simpleMemory1",
+          name: "Simple Memory1",
+          type: "tool",
+          x: 1950,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "openAIChatModel",
+          name: "OpenAI Chat Model",
+          type: "tool",
+          x: 1950,
+          y: 270,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "postgresChatMemory",
+          name: "Postgres Chat Memory",
+          type: "tool",
+          x: 1950,
+          y: 340,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "mistralChatModel",
+          name: "Mistral Cloud Chat Model",
+          type: "tool",
+          x: 1950,
+          y: 410,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "grokChatModel",
+          name: "xAI Grok Chat Model",
+          type: "tool",
+          x: 1950,
+          y: 480,
+          width: 170,
+          height: 50,
+        },
+
+        // ... and so on, for all original nodes
+        {
+          id: "problemSolvingAgent",
+          name: "Problem-Solving Agent",
+          type: "agent",
+          x: 2150,
+          y: 50,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "specializedDebuggingAgent",
+          name: "Specialized Debugging Agent",
+          type: "agent",
+          x: 2150,
+          y: 150,
+          width: 250,
+          height: 50,
+        },
+        {
+          id: "monitoringTool",
+          name: "Monitoring Tool",
+          type: "tool",
+          x: 2350,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "feedbackAdaptationAgent",
+          name: "Feedback & Adaptation Agent",
+          type: "agent",
+          x: 2350,
+          y: 150,
+          width: 250,
+          height: 50,
+        },
+
+        // New nodes for the final improvements
+        {
+          id: "knowledgeBaseAgent",
+          name: "Knowledge Base Agent",
+          type: "agent",
+          x: 2550,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "vectorDatabaseTool",
+          name: "Vector Database Tool",
+          type: "tool",
+          x: 2700,
+          y: 50,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "maintenanceAgent",
+          name: "Maintenance Agent",
+          type: "agent",
+          x: 2550,
+          y: 150,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "systemMonitoringTool",
+          name: "System Monitoring Tool",
+          type: "tool",
+          x: 2700,
+          y: 150,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "publicationMonetizationAgent",
+          name: "Publication & Monetization Agent",
+          type: "agent",
+          x: 2550,
+          y: 250,
+          width: 250,
+          height: 50,
+        },
+        {
+          id: "marketingCopyTool",
+          name: "Marketing Copy Tool",
+          type: "tool",
+          x: 2820,
+          y: 200,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "stripeTool",
+          name: "Stripe Tool",
+          type: "tool",
+          x: 2820,
+          y: 270,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "websiteDeploymentTool",
+          name: "Website Deployment Tool",
+          type: "tool",
+          x: 2820,
+          y: 340,
+          width: 190,
+          height: 50,
+        },
+
+        // Final components
+        {
+          id: "resourceManagementAgent",
+          name: "Resource Management Agent",
+          type: "agent",
+          x: 3000,
+          y: 50,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "apiMonitoringTool",
+          name: "API Monitoring Tool",
+          type: "tool",
+          x: 3250,
+          y: 50,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "parallelizationAgent",
+          name: "Parallelization Agent",
+          type: "agent",
+          x: 3000,
+          y: 150,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "queueManagementTool",
+          name: "Queue Management Tool",
+          type: "tool",
+          x: 3250,
+          y: 150,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "marketResearchAgent",
+          name: "Market Research Agent",
+          type: "agent",
+          x: 3000,
+          y: 250,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "dataSynthesisAgent",
+          name: "Data Synthesis Agent",
+          type: "agent",
+          x: 3000,
+          y: 350,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "googleSearchTool",
+          name: "Google Search Tool",
+          type: "tool",
+          x: 3250,
+          y: 250,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "webScraperTool",
+          name: "Web Scraper Tool",
+          type: "tool",
+          x: 3250,
+          y: 350,
+          width: 170,
+          height: 50,
+        },
+
+        // Final, final components
+        {
+          id: "brandTemplateManagerAgent",
+          name: "Brand & Template Manager Agent",
+          type: "agent",
+          x: 1000,
+          y: 700,
+          width: 250,
+          height: 50,
+        },
+        {
+          id: "templateLibraryTool",
+          name: "Template Library Tool",
+          type: "tool",
+          x: 1000,
+          y: 800,
+          width: 170,
+          height: 50,
+        },
+
+        // New components for full autonomy
+        {
+          id: "customerSupportAgent",
+          name: "Customer Support Agent",
+          type: "agent",
+          x: 3000,
+          y: 450,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "customerSupportTool",
+          name: "Customer Support Tool",
+          type: "tool",
+          x: 3250,
+          y: 450,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "reputationAgent",
+          name: "Reputation Agent",
+          type: "agent",
+          x: 3000,
+          y: 550,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "socialMediaMonitoringTool",
+          name: "Social Media Monitoring Tool",
+          type: "tool",
+          x: 3250,
+          y: 550,
+          width: 250,
+          height: 50,
+        },
+        {
+          id: "legalComplianceAgent",
+          name: "Legal & Compliance Agent",
+          type: "agent",
+          x: 3000,
+          y: 650,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "legalResearchTool",
+          name: "Legal Research Tool",
+          type: "tool",
+          x: 3250,
+          y: 650,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "customerInput",
+          name: "Customer Input (Webhooks)",
+          type: "trigger",
+          x: 2800,
+          y: 450,
+          width: 200,
+          height: 50,
+        },
+      ];
+
+      const connections = [
+        // MPA Flow Connections
+        ["scheduleTriggerMPA", "masterAssistant"],
+        ["telegramTriggerMPA", "masterAssistant"],
+        ["masterAssistant", "getemail"],
+        ["masterAssistant", "googlecalendar"],
+        ["masterAssistant", "transcribeAudio"],
+        ["masterAssistant", "startFactory"],
+        ["masterAssistant", "replyTelegram"],
+        ["masterAssistant", "slack"],
+
+        // Connection between the two workflows
+        ["startFactory", "mcpTrigger"],
+
+        // Factory Flow Connections (Mapped to Protocols)
+        ["mcpTrigger", "projectArchitect"],
+        ["manualTriggerFactory", "projectArchitect"],
+        ["scheduleTriggerFactory", "projectArchitect"],
+
+        // Connections to the new Brand & Template Manager Agent
+        ["projectArchitect", "brandTemplateManagerAgent"],
+        ["brandTemplateManagerAgent", "designerAgent"],
+        ["brandTemplateManagerAgent", "manAtWork"],
+        ["brandTemplateManagerAgent", "templateLibraryTool"],
+
+        ["projectArchitect", "designerAgent"],
+        ["designerAgent", "manAtWork"],
+        ["manAtWork", "qaProtocol"],
+        ["qaProtocol", "debuggingProtocol"],
+        ["debuggingProtocol", "deploymentProtocol"],
+        ["deploymentProtocol", "resultsVerification"],
+        ["resultsVerification", "humanHandoff"],
+
+        // Tool connections to agents
+        ["manAtWork", "gitHubTool"],
+        ["manAtWork", "dockerTool"],
+        ["manAtWork", "postgresTool"],
+        ["debuggingProtocol", "codeExecutionTool"],
+        ["debuggingProtocol", "gitHubTool"], // For pulling and pushing fixes
+        ["humanHandoff", "trelloAsanaTool"],
+
+        // Original agents as sub-processes
+        ["projectArchitect", "superAgentManager"],
+        ["manAtWork", "interpreter"],
+        ["qaProtocol", "qualityControl"],
+
+        // Original connections
+        ["interpreter", "simpleMemory"],
+        ["interpreter", "ollamaChatModel"],
+        ["interpreter", "telegramToolFactory"],
+        ["interpreter", "ifNode"],
+        ["interpreter", "getCharge"],
+        ["interpreter", "getAnItem"],
+        ["interpreter", "assistentTool"],
+        ["interpreter", "chatMemoryManager"],
+
+        ["qualityControl", "simpleMemory1"],
+        ["qualityControl", "openAIChatModel"],
+        ["qualityControl", "ifNode"],
+        ["qualityControl", "updateVideo"],
+        ["qualityControl", "callN8nTool"],
+        ["qualityControl", "sendAMessage"],
+
+        ["superAgentManager", "postgresChatMemory"],
+        ["superAgentManager", "mistralChatModel"],
+        ["superAgentManager", "grokChatModel"],
+        ["superAgentManager", "aiAgentTool1"],
+        ["superAgentManager", "aiAgentTool2"],
+        ["superAgentManager", "aiAgentTool3"],
+        ["superAgentManager", "aiAgentTool4"],
+        ["superAgentManager", "aiAgentTool5"],
+        ["superAgentManager", "aiAgentTool6"],
+        ["superAgentManager", "aiAgentTool7"],
+        ["superAgentManager", "aiAgentTool8"],
+        ["superAgentManager", "aiAgentTool9"],
+        ["superAgentManager", "aiAgentTool10"],
+        ["superAgentManager", "aiAgentTool11"],
+        ["superAgentManager", "aiAgentTool12"],
+
+        // New connections for the improved system
+        ["debuggingProtocol", "problemSolvingAgent"],
+        ["problemSolvingAgent", "specializedDebuggingAgent"],
+        ["qualityControl", "monitoringTool"],
+        ["monitoringTool", "feedbackAdaptationAgent"],
+        ["feedbackAdaptationAgent", "projectArchitect"],
+
+        // Connections for the final improvements
+        ["specializedDebuggingAgent", "knowledgeBaseAgent"],
+        ["resultsVerification", "knowledgeBaseAgent"],
+        ["knowledgeBaseAgent", "vectorDatabaseTool"],
+        ["maintenanceAgent", "systemMonitoringTool"],
+        ["maintenanceAgent", "knowledgeBaseAgent"],
+        ["maintenanceAgent", "publicationMonetizationAgent"],
+        ["deploymentProtocol", "publicationMonetizationAgent"],
+        ["publicationMonetizationAgent", "marketingCopyTool"],
+        ["publicationMonetizationAgent", "stripeTool"],
+        ["publicationMonetizationAgent", "websiteDeploymentTool"],
+
+        // Final connections for autonomous factory
+        ["resourceManagementAgent", "apiMonitoringTool"],
+        ["resourceManagementAgent", "masterAssistant"], // Sends a notification
+        ["parallelizationAgent", "projectArchitect"],
+        ["parallelizationAgent", "queueManagementTool"],
+        ["manAtWork", "queueManagementTool"], // Pulls tasks from the queue
+        ["marketResearchAgent", "googleSearchTool"],
+        ["marketResearchAgent", "webScraperTool"],
+        ["marketResearchAgent", "dataSynthesisAgent"],
+        ["dataSynthesisAgent", "projectArchitect"], // Feeds new ideas back into the factory
+
+        // New connections for full autonomy
+        ["resultsVerification", "legalComplianceAgent"],
+        ["legalComplianceAgent", "legalResearchTool"],
+        ["customerInput", "customerSupportTool"],
+        ["customerSupportTool", "customerSupportAgent"],
+        ["customerSupportAgent", "feedbackAdaptationAgent"],
+        ["customerSupportAgent", "reputationAgent"],
+        ["reputationAgent", "socialMediaMonitoringTool"],
+        ["reputationAgent", "masterAssistant"],
+      ];
+
+      const nodeColors = {
+        trigger: { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af" },
+        agent: { bg: "#fefcbf", border: "#fcd34d", text: "#b45309" },
+        tool: { bg: "#d1fae5", border: "#34d399", text: "#065f46" },
+        output: { bg: "#f3e8ff", border: "#c084fc", text: "#7e22ce" },
+      };
+
+      function draw() {
+        const parent = canvas.parentElement;
+        canvas.width = 5000;
+        canvas.height = 3000;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.scale(scale, scale);
+
+        ctx.strokeStyle = "#4b5563";
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+
+        connections.forEach(([fromId, toId]) => {
+          const fromNode = nodes.find((n) => n.id === fromId);
+          const toNode = nodes.find((n) => n.id === toId);
+
+          if (fromNode && toNode) {
+            ctx.beginPath();
+            ctx.moveTo(
+              fromNode.x + fromNode.width / 2,
+              fromNode.y + fromNode.height / 2
+            );
+            ctx.lineTo(
+              toNode.x + toNode.width / 2,
+              toNode.y + toNode.height / 2
+            );
+            ctx.stroke();
+          }
+        });
+
+        nodes.forEach((node) => {
+          const colors = nodeColors[node.type];
+
+          ctx.fillStyle = colors.bg;
+          ctx.strokeStyle = colors.border;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(node.x, node.y, node.width, node.height, 8);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = colors.text;
+          ctx.font = "14px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(
+            node.name,
+            node.x + node.width / 2,
+            node.y + node.height / 2
+          );
+        });
+
+        ctx.restore();
+      }
+
+      canvas.addEventListener("mousedown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) / scale;
+        const mouseY = (e.clientY - rect.top) / scale;
+
+        draggedNode = nodes.find(
+          (node) =>
+            mouseX >= node.x &&
+            mouseX <= node.x + node.width &&
+            mouseY >= node.y &&
+            mouseY <= node.y + node.height
+        );
+        if (draggedNode) {
+          isDragging = true;
+          offsetX = mouseX - draggedNode.x;
+          offsetY = mouseY - draggedNode.y;
+          canvas.style.cursor = "grabbing";
+        }
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (isDragging) {
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = (e.clientX - rect.left) / scale;
+          const mouseY = (e.clientY - rect.top) / scale;
+          draggedNode.x = mouseX - offsetX;
+          draggedNode.y = mouseY - offsetY;
+          draw();
+        } else {
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = (e.clientX - rect.left) / scale;
+          const mouseY = (e.clientY - rect.top) / scale;
+          const hoverNode = nodes.find(
+            (node) =>
+              mouseX >= node.x &&
+              mouseX <= node.x + node.width &&
+              mouseY >= node.y &&
+              mouseY <= node.y + node.height
+          );
+          canvas.style.cursor = hoverNode ? "grab" : "default";
+        }
+      });
+
+      canvas.addEventListener("mouseup", () => {
+        isDragging = false;
+        draggedNode = null;
+        canvas.style.cursor = "default";
+      });
+
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.max(0.2, Math.min(2.0, scale * zoomDelta));
+
+        if (newScale !== scale) {
+          scale = newScale;
+          draw();
+        }
+      });
+
+      window.addEventListener("load", draw);
+      window.addEventListener("resize", draw);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+{
+    "require": {
+        "guzzlehttp/guzzle": "^7.10",
+        "smalot/pdfparser": "^2.1",
+        "phpoffice/phpword": "^1.1"
+    }
+}

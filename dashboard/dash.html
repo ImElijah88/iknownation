@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neo's Presentation Workshop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background-color: #121212;
+        background-image: linear-gradient(
+          to right top,
+          #051937,
+          #004d7a,
+          #008793,
+          #00bf72,
+          #a8eb12
+        );
+        font-family: "Inter", sans-serif;
+      }
+      .glassmorphic-card {
+        background-color: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 1rem;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        signInWithCustomToken,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        onSnapshot,
+        doc,
+        setDoc,
+        addDoc,
+        getDocs,
+        deleteDoc,
+        query,
+        orderBy,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      setLogLevel("debug"); // Enable Firestore debug logging
+
+      const appId =
+        typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+      const firebaseConfig = JSON.parse(
+        typeof __firebase_config !== "undefined" ? __firebase_config : "{}"
+      );
+
+      let db,
+        auth,
+        userId = null;
+      let templatesCollection, presentationsCollection;
+      let templates = [];
+      let savedPresentations = [];
+
+      async function initFirebase() {
+        try {
+          const app = initializeApp(firebaseConfig);
+          db = getFirestore(app);
+          auth = getAuth(app);
+
+          await new Promise((resolve) => {
+            if (
+              typeof __initial_auth_token !== "undefined" &&
+              __initial_auth_token
+            ) {
+              signInWithCustomToken(auth, __initial_auth_token)
+                .then(() => {
+                  console.log("Signed in with custom token.");
+                  resolve();
+                })
+                .catch((error) => {
+                  console.error("Custom token sign-in failed:", error);
+                  signInAnonymously(auth).then(() => {
+                    console.log("Signed in anonymously.");
+                    resolve();
+                  });
+                });
+            } else {
+              signInAnonymously(auth).then(() => {
+                console.log("Signed in anonymously.");
+                resolve();
+              });
+            }
+          });
+
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              userId = user.uid;
+              console.log("User ID:", userId);
+              templatesCollection = collection(
+                db,
+                "artifacts",
+                appId,
+                "users",
+                userId,
+                "templates"
+              );
+              presentationsCollection = collection(
+                db,
+                "artifacts",
+                appId,
+                "users",
+                userId,
+                "presentations"
+              );
+
+              setupRealtimeListeners();
+            } else {
+              userId = crypto.randomUUID();
+              console.log("Using anonymous user ID:", userId);
+              templatesCollection = collection(
+                db,
+                "artifacts",
+                appId,
+                "users",
+                userId,
+                "templates"
+              );
+              presentationsCollection = collection(
+                db,
+                "artifacts",
+                appId,
+                "users",
+                userId,
+                "presentations"
+              );
+
+              setupRealtimeListeners();
+            }
+          });
+        } catch (error) {
+          console.error("Firebase initialization failed:", error);
+        }
+      }
+
+      function setupRealtimeListeners() {
+        onSnapshot(templatesCollection, (snapshot) => {
+          templates = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          updateTemplateDropdowns();
+          updateTemplateList();
+        });
+
+        onSnapshot(presentationsCollection, (snapshot) => {
+          savedPresentations = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          updatePresentationList();
+        });
+      }
+
+      initFirebase();
+
+      const state = {
+        activeView: "template-creation",
+        currentTemplate: null,
+        currentPresentation: null,
+        templateList: [],
+        presentationList: [],
+      };
+
+      const elements = {
+        views: {
+          templateCreation: document.getElementById("template-creation-view"),
+          presentationGenerator: document.getElementById(
+            "presentation-generator-view"
+          ),
+          templateList: document.getElementById("template-list-view"),
+          presentationList: document.getElementById("presentation-list-view"),
+        },
+        nav: {
+          templateCreation: document.getElementById("nav-template-creation"),
+          presentationGenerator: document.getElementById(
+            "nav-presentation-generator"
+          ),
+          templateList: document.getElementById("nav-template-list"),
+          presentationList: document.getElementById("nav-presentation-list"),
+        },
+        templateForm: {
+          theme: document.getElementById("template-theme-select"),
+          type: document.getElementById("template-type-select"),
+          prompt: document.getElementById("template-prompt-input"),
+          output: document.getElementById("template-output-area"),
+          generateBtn: document.getElementById("generate-template-btn"),
+          saveBtn: document.getElementById("save-template-btn"),
+          editBtn: document.getElementById("edit-template-btn"),
+        },
+        templateGenerator: {
+          savedTemplatesSelect: document.getElementById(
+            "saved-templates-select"
+          ),
+          fileInput: document.getElementById("file-input"),
+          generateSpeech: document.getElementById("generate-speech-checkbox"),
+          generateBtn: document.getElementById("generate-presentation-btn"),
+        },
+        preview: document.getElementById("preview-pane"),
+        status: document.getElementById("status-message"),
+        fileLists: {
+          templates: document.getElementById("templates-file-list"),
+          presentations: document.getElementById("presentations-file-list"),
+        },
+      };
+
+      const themes = [
+        "Modern Minimalist",
+        "Corporate Professional",
+        "Creative & Artistic",
+        "Retro Vintage",
+        "Dark & Moody",
+      ];
+      const presentationTypes = [
+        "Business Pitch",
+        "Project Proposal",
+        "Educational Lesson",
+        "Quarterly Report",
+        "Personal Portfolio",
+      ];
+
+      // Helper function to show different views
+      function showView(viewName) {
+        Object.values(elements.views).forEach((view) =>
+          view.classList.add("hidden")
+        );
+        elements.views[viewName].classList.remove("hidden");
+        state.activeView = viewName;
+      }
+
+      // Fill dropdown menus with data
+      function populateMenus() {
+        themes.forEach((theme) => {
+          const option = document.createElement("option");
+          option.value = theme;
+          option.textContent = theme;
+          elements.templateForm.theme.appendChild(option);
+        });
+        presentationTypes.forEach((type) => {
+          const option = document.createElement("option");
+          option.value = type;
+          option.textContent = type;
+          elements.templateForm.type.appendChild(option);
+        });
+      }
+      populateMenus();
+
+      function updateTemplateDropdowns() {
+        elements.templateGenerator.savedTemplatesSelect.innerHTML =
+          '<option value="">Select a template</option>';
+        templates.forEach((template) => {
+          const option = document.createElement("option");
+          option.value = template.id;
+          option.textContent = template.name;
+          elements.templateGenerator.savedTemplatesSelect.appendChild(option);
+        });
+      }
+
+      function updateTemplateList() {
+        elements.fileLists.templates.innerHTML = "";
+        templates.forEach((template) => {
+          const li = document.createElement("li");
+          li.className =
+            "flex justify-between items-center bg-gray-100 p-2 rounded-lg mb-2";
+          li.innerHTML = `
+                    <span class="text-gray-900">${template.name}</span>
+                    <div>
+                        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm" onclick="previewTemplate('${template.id}')">Preview</button>
+                        <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-sm" onclick="deleteFile('${template.id}', 'template')">Delete</button>
+                    </div>
+                `;
+          elements.fileLists.templates.appendChild(li);
+        });
+      }
+
+      function updatePresentationList() {
+        elements.fileLists.presentations.innerHTML = "";
+        savedPresentations.forEach((pres) => {
+          const li = document.createElement("li");
+          li.className =
+            "flex justify-between items-center bg-gray-100 p-2 rounded-lg mb-2";
+          li.innerHTML = `
+                    <span class="text-gray-900">${pres.name}</span>
+                    <div>
+                        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm" onclick="previewPresentation('${pres.id}')">Preview</button>
+                        <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-sm" onclick="downloadPresentation('${pres.id}')">Download</button>
+                        <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-sm" onclick="deleteFile('${pres.id}', 'presentation')">Delete</button>
+                    </div>
+                `;
+          elements.fileLists.presentations.appendChild(li);
+        });
+      }
+
+      async function saveTemplate() {
+        try {
+          if (!state.currentTemplate) {
+            throw new Error("No template to save. Please generate one first.");
+          }
+          const templateName = prompt("Enter a name for your template:");
+          if (!templateName) {
+            throw new Error("Template name cannot be empty.");
+          }
+
+          await setDoc(
+            doc(
+              templatesCollection,
+              templateName.toLowerCase().replace(/\s/g, "-")
+            ),
+            {
+              name: templateName,
+              ...state.currentTemplate,
+            }
+          );
+          showMessage(`Template '${templateName}' saved successfully!`);
+          showView("templateList");
+        } catch (error) {
+          showMessage(`Error saving template: ${error.message}`, "error");
+          console.error("Error saving template:", error);
+        }
+      }
+
+      async function deleteFile(fileId, type) {
+        if (confirm(`Are you sure you want to delete this ${type}?`)) {
+          try {
+            if (type === "template") {
+              await deleteDoc(doc(templatesCollection, fileId));
+              showMessage(`Template '${fileId}' deleted.`);
+            } else if (type === "presentation") {
+              await deleteDoc(doc(presentationsCollection, fileId));
+              showMessage(`Presentation '${fileId}' deleted.`);
+            }
+          } catch (error) {
+            showMessage(`Error deleting ${type}: ${error.message}`, "error");
+            console.error(`Error deleting ${type}:`, error);
+          }
+        }
+      }
+
+      async function fetchTemplates() {
+        showMessage("Fetching templates...", "info");
+        try {
+          const snapshot = await getDocs(templatesCollection);
+          templates = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          updateTemplateDropdowns();
+          updateTemplateList();
+          showMessage("Templates loaded.", "success");
+        } catch (e) {
+          showMessage(`Error fetching templates: ${e.message}`, "error");
+        }
+      }
+
+      elements.templateForm.saveBtn.addEventListener("click", saveTemplate);
+
+      async function previewTemplate(templateId) {
+        const template = templates.find((t) => t.id === templateId);
+        if (template) {
+          renderTemplatePreview(template);
+          showView("presentationGenerator");
+        }
+      }
+
+      async function previewPresentation(presentationId) {
+        const presentation = savedPresentations.find(
+          (p) => p.id === presentationId
+        );
+        if (presentation) {
+          renderPresentationPreview(presentation);
+          showView("presentationGenerator");
+        }
+      }
+
+      function downloadPresentation(presentationId) {
+        const presentation = savedPresentations.find(
+          (p) => p.id === presentationId
+        );
+        if (!presentation) {
+          showMessage("Presentation not found for download.", "error");
+          return;
+        }
+
+        const htmlContent = generatePresentationHtml(presentation);
+        const blob = new Blob([htmlContent], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download =
+          presentation.name.toLowerCase().replace(/\s/g, "-") + ".html";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showMessage(`Downloading '${presentation.name}'...`, "success");
+      }
+
+      // Event Listeners for Navigation
+      elements.nav.templateCreation.addEventListener("click", () =>
+        showView("templateCreation")
+      );
+      elements.nav.presentationGenerator.addEventListener("click", () =>
+        showView("presentationGenerator")
+      );
+      elements.nav.templateList.addEventListener("click", () =>
+        showView("templateList")
+      );
+      elements.nav.presentationList.addEventListener("click", () =>
+        showView("presentationList")
+      );
+
+      elements.templateForm.generateBtn.addEventListener("click", async () => {
+        const theme = elements.templateForm.theme.value;
+        const type = elements.templateForm.type.value;
+        const promptText = elements.templateForm.prompt.value;
+
+        if (!theme || !type || !promptText) {
+          showMessage("Please fill out all fields.", "error");
+          return;
+        }
+
+        showMessage("Generating template with LLM...", "info");
+        const fullPrompt = `Generate a structured JSON object for a presentation template with a ${theme} theme for a ${type} presentation. The user prompt is: "${promptText}". The JSON should be an object with keys: "name" (a title for the template), "description", and "slides" (an array of slide objects). Each slide object should have a "type" (e.g., "title_slide", "content_slide", "image_slide", "conclusion_slide") and "content" (an object with keys for text and image placeholders, e.g., "title", "body", "image_url"). Be creative and professional.`;
+
+        try {
+          const response = await fetch("http://127.0.0.1:5001/mcp/call_tool", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tool_name: "generate_text",
+              tool_args: {
+                prompt: fullPrompt,
+              },
+            }),
+          });
+          const data = await response.json();
+          if (data.status === "success" && data.result) {
+            const templateJson = JSON.parse(data.result);
+            state.currentTemplate = templateJson;
+            elements.templateForm.output.value = JSON.stringify(
+              templateJson,
+              null,
+              2
+            );
+            showMessage("Template generated successfully!", "success");
+          } else {
+            throw new Error("LLM response was not in the expected format.");
+          }
+        } catch (error) {
+          showMessage(`Error generating template: ${error.message}`, "error");
+          console.error("LLM Generation Error:", error);
+        }
+      });
+
+      elements.templateForm.editBtn.addEventListener("click", () => {
+        try {
+          const editedJson = JSON.parse(elements.templateForm.output.value);
+          state.currentTemplate = editedJson;
+          showMessage("Template updated from editor.", "success");
+        } catch (error) {
+          showMessage(`Invalid JSON: ${error.message}`, "error");
+        }
+      });
+
+      elements.templateGenerator.generateBtn.addEventListener(
+        "click",
+        async () => {
+          const templateId =
+            elements.templateGenerator.savedTemplatesSelect.value;
+          const fileInput = elements.templateGenerator.fileInput;
+          const generateSpeech =
+            elements.templateGenerator.generateSpeech.checked;
+
+          if (!templateId || !fileInput.files.length) {
+            showMessage("Please select a template and upload a file.", "error");
+            return;
+          }
+
+          const selectedTemplate = templates.find((t) => t.id === templateId);
+          if (!selectedTemplate) {
+            showMessage("Selected template not found.", "error");
+            return;
+          }
+
+          showMessage("Generating presentation with LLM...", "info");
+
+          // Read file content
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          reader.onload = async function (e) {
+            const fileContent = e.target.result;
+            const fullPrompt = `Create presentation content in a structured JSON format based on the following text: "${fileContent}". Use the provided template structure: ${JSON.stringify(
+              selectedTemplate
+            )}. Also, provide a keynote speech for the entire presentation as a separate key.`;
+
+            try {
+              const response = await fetch(
+                "http://127.0.0.1:5001/mcp/call_tool",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    tool_name: "generate_text",
+                    tool_args: {
+                      prompt: fullPrompt,
+                    },
+                  }),
+                }
+              );
+              const data = await response.json();
+              if (data.status === "success" && data.result) {
+                const presentationContent = JSON.parse(data.result);
+                const presentationName = prompt(
+                  "Enter a name for this presentation:"
+                );
+                if (!presentationName) return;
+
+                const finalPresentation = {
+                  name: presentationName,
+                  template: selectedTemplate,
+                  content: presentationContent,
+                };
+
+                await addDoc(presentationsCollection, finalPresentation);
+                showMessage(
+                  `Presentation '${presentationName}' generated and saved!`,
+                  "success"
+                );
+                showView("presentationList");
+              } else {
+                throw new Error("LLM response was not in the expected format.");
+              }
+            } catch (error) {
+              showMessage(
+                `Error generating presentation: ${error.message}`,
+                "error"
+              );
+              console.error("LLM Generation Error:", error);
+            }
+          };
+          reader.readAsText(file);
+        }
+      );
+
+      function showMessage(message, type = "info") {
+        const el = elements.status;
+        el.textContent = message;
+        el.className = "p-4 rounded-lg mt-4 text-center";
+        switch (type) {
+          case "info":
+            el.classList.add("bg-blue-100", "text-blue-800");
+            break;
+          case "success":
+            el.classList.add("bg-green-100", "text-green-800");
+            break;
+          case "error":
+            el.classList.add("bg-red-100", "text-red-800");
+            break;
+        }
+        el.classList.remove("hidden");
+      }
+
+      function renderTemplatePreview(template) {
+        let html = '<div class="p-6 bg-white rounded-lg shadow-xl">';
+        html += `<h2 class="text-3xl font-bold mb-4">${template.name}</h2>`;
+        html += `<p class="text-gray-600 mb-6">${template.description}</p>`;
+        html += '<div class="space-y-6">';
+        template.slides.forEach((slide, index) => {
+          html += `<div class="p-4 border border-gray-200 rounded-lg">`;
+          html += `<h4 class="text-xl font-semibold mb-2">Slide ${index + 1}: ${
+            slide.type
+          }</h4>`;
+          html += `<pre class="bg-gray-50 p-2 rounded-md text-sm">${JSON.stringify(
+            slide.placeholders,
+            null,
+            2
+          )}</pre>`;
+          html += `</div>`;
+        });
+        html += "</div></div>";
+        elements.preview.innerHTML = html;
+      }
+
+      function generatePresentationHtml(presentation) {
+        let html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${presentation.name}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; padding: 2rem; }
+        .slide { background-color: white; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem; }
+        .title-slide { text-align: center; }
+        .content-slide h2 { border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .speech-box { background-color: #f1f5f9; padding: 1.5rem; border-left: 4px solid #3b82f6; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center; margin-bottom: 2rem;">${presentation.name}</h1>
+            `;
+
+        presentation.content.slides.forEach((slideContent, index) => {
+          const templateSlide = presentation.template.slides[index] || {};
+          const slideHtml =
+            templateSlide.type === "title_slide"
+              ? `<div class="slide title-slide">
+                        <h2 style="font-size: 2rem; font-weight: 700;">${slideContent.title}</h2>
+                        <p style="font-size: 1.25rem;">${slideContent.subtitle}</p>
+                    </div>`
+              : `<div class="slide content-slide">
+                        <h2 style="font-size: 1.5rem; font-weight: 600;">${
+                          slideContent.heading
+                        }</h2>
+                        <p>${slideContent.text}</p>
+                        ${
+                          slideContent.image_url
+                            ? `<img src="${slideContent.image_url}" alt="Presentation visual" style="margin-top: 1rem; border-radius: 0.5rem; max-width: 100%;">`
+                            : ""
+                        }
+                    </div>`;
+          html += slideHtml;
+        });
+
+        if (presentation.content.speech) {
+          html += `<div class="speech-box">
+                    <h3 style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">Speech Script</h3>
+                    <p>${presentation.content.speech}</p>
+                </div>`;
+        }
+
+        html += `
+</body>
+</html>
+            `;
+        return html;
+      }
+
+      function renderPresentationPreview(presentation) {
+        elements.preview.innerHTML = `<iframe srcdoc='${generatePresentationHtml(
+          presentation
+        ).replace(
+          /'/g,
+          "&apos;"
+        )}' class="w-full h-full border-0 rounded-lg shadow-xl bg-white"></iframe>`;
+      }
+
+      // Run on page load
+      showView("templateCreation");
+      fetchTemplates();
+    </script>
+  </head>
+  <body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8">
+      <header class="bg-blue-600 text-white p-6 rounded-lg shadow-lg mb-8">
+        <h1 class="text-3xl md:text-5xl font-extrabold text-center">
+          Neo's Presentation Workshop
+        </h1>
+      </header>
+
+      <nav class="flex justify-center space-x-2 md:space-x-4 mb-8">
+        <button
+          id="nav-template-creation"
+          class="bg-white text-blue-600 font-semibold py-2 px-4 md:px-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-200"
+        >
+          Template Creation
+        </button>
+        <button
+          id="nav-template-list"
+          class="bg-white text-blue-600 font-semibold py-2 px-4 md:px-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-200"
+        >
+          My Templates
+        </button>
+        <button
+          id="nav-presentation-generator"
+          class="bg-white text-blue-600 font-semibold py-2 px-4 md:px-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-200"
+        >
+          Presentation Generator
+        </button>
+        <button
+          id="nav-presentation-list"
+          class="bg-white text-blue-600 font-semibold py-2 px-4 md:px-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-200"
+        >
+          My Presentations
+        </button>
+      </nav>
+
+      <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left Pane: Control Panel -->
+        <div class="bg-white p-6 rounded-lg shadow-xl h-full">
+          <!-- Template Creation View -->
+          <div id="template-creation-view" class="space-y-6">
+            <h2 class="text-2xl font-bold text-gray-700">
+              Create a New Template
+            </h2>
+            <div>
+              <label
+                for="template-theme-select"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Theme</label
+              >
+              <select
+                id="template-theme-select"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a theme...</option>
+              </select>
+            </div>
+            <div>
+              <label
+                for="template-type-select"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Presentation Type</label
+              >
+              <select
+                id="template-type-select"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a type...</option>
+              </select>
+            </div>
+            <div>
+              <label
+                for="template-prompt-input"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Prompt for Template</label
+              >
+              <textarea
+                id="template-prompt-input"
+                class="w-full h-32 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., A template for a ten-slide project proposal presentation. It should include sections for problem, solution, market size, and a timeline."
+              ></textarea>
+            </div>
+            <div class="flex space-x-4">
+              <button
+                id="generate-template-btn"
+                class="flex-1 bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              >
+                Generate Template
+              </button>
+              <button
+                id="save-template-btn"
+                class="flex-1 bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition-colors duration-200"
+              >
+                Save Template
+              </button>
+            </div>
+            <div>
+              <label
+                for="template-output-area"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Generated JSON (Editable)</label
+              >
+              <textarea
+                id="template-output-area"
+                class="w-full h-64 px-4 py-2 border rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="JSON output from LLM will appear here..."
+              ></textarea>
+            </div>
+            <button
+              id="edit-template-btn"
+              class="w-full bg-yellow-500 text-white font-semibold py-3 rounded-lg hover:bg-yellow-600 transition-colors duration-200"
+            >
+              Update from Editor
+            </button>
+          </div>
+
+          <!-- Template List View -->
+          <div id="template-list-view" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">
+              My Saved Templates
+            </h2>
+            <ul id="templates-file-list" class="space-y-2"></ul>
+          </div>
+
+          <!-- Presentation Generator View -->
+          <div id="presentation-generator-view" class="hidden space-y-6">
+            <h2 class="text-2xl font-bold text-gray-700">
+              Generate a Presentation
+            </h2>
+            <div>
+              <label
+                for="saved-templates-select"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Select a Saved Template</label
+              >
+              <select
+                id="saved-templates-select"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a template...</option>
+              </select>
+            </div>
+            <div>
+              <label
+                for="file-input"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Upload Text File</label
+              >
+              <input
+                type="file"
+                id="file-input"
+                accept=".txt"
+                class="w-full text-gray-700"
+              />
+            </div>
+            <div class="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="generate-speech-checkbox"
+                class="form-checkbox text-blue-600 rounded"
+              />
+              <label
+                for="generate-speech-checkbox"
+                class="text-sm font-medium text-gray-700"
+                >Generate a keynote speech</label
+              >
+            </div>
+            <button
+              id="generate-presentation-btn"
+              class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+            >
+              Generate Presentation
+            </button>
+          </div>
+
+          <!-- Presentation List View -->
+          <div id="presentation-list-view" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">
+              My Saved Presentations
+            </h2>
+            <ul id="presentations-file-list" class="space-y-2"></ul>
+          </div>
+          <div id="status-message" class="hidden"></div>
+        </div>
+
+        <!-- Right Pane: Preview Area -->
+        <div
+          id="preview-pane"
+          class="bg-gray-200 p-6 rounded-lg shadow-xl flex items-center justify-center text-gray-500"
+        >
+          <p>Preview will appear here...</p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

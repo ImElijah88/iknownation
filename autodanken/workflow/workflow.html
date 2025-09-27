@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Unified Workflow Diagram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f7f7f7;
+        padding: 2rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+      .container {
+        width: 100%;
+        height: 80vh;
+        max-width: 1200px;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: auto; /* Changed to auto for both scroll directions */
+      }
+      canvas {
+        width: 3000px;
+        height: 2000px; /* Increased height to accommodate vertical layout */
+        transform-origin: 0 0;
+        cursor: grab;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100">
+    <div class="container rounded-xl shadow-lg">
+      <canvas id="workflowCanvas"></canvas>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("workflowCanvas");
+      const ctx = canvas.getContext("2d");
+      let scale = 1.0;
+      let isDragging = false;
+      let draggedNode = null;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      // Node definitions and their initial positions
+      const nodes = [
+        // Master Personal Assistant (MPA) Flow
+        {
+          id: "scheduleTriggerMPA",
+          name: "Schedule Trigger",
+          type: "trigger",
+          x: 50,
+          y: 100,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "telegramTriggerMPA",
+          name: "Telegram Trigger",
+          type: "trigger",
+          x: 50,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "masterAssistant",
+          name: "Master Personal Assistant",
+          type: "agent",
+          x: 250,
+          y: 150,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "getemail",
+          name: "Get Email",
+          type: "tool",
+          x: 500,
+          y: 50,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "googlecalendar",
+          name: "Google Calendar",
+          type: "tool",
+          x: 500,
+          y: 120,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "transcribeAudio",
+          name: "Transcribe audio",
+          type: "tool",
+          x: 500,
+          y: 190,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "startFactory",
+          name: "Start Factory Workflow",
+          type: "tool",
+          x: 500,
+          y: 260,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "replyTelegram",
+          name: "Reply in Telegram",
+          type: "output",
+          x: 700,
+          y: 150,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "slack",
+          name: "Slack",
+          type: "output",
+          x: 700,
+          y: 250,
+          width: 120,
+          height: 50,
+        },
+
+        // Factory Workflow
+        {
+          id: "mcpTrigger",
+          name: "MCP Server Trigger",
+          type: "trigger",
+          x: 900,
+          y: 150,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "manualTriggerFactory",
+          name: "Manual Trigger",
+          type: "trigger",
+          x: 900,
+          y: 300,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "interpreter",
+          name: "interpreter",
+          type: "agent",
+          x: 1100,
+          y: 100,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "qualityControl",
+          name: "Quality Control Agent",
+          type: "agent",
+          x: 1100,
+          y: 300,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "superAgentManager",
+          name: "Super Agent manager",
+          type: "agent",
+          x: 1100,
+          y: 500,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "assistent",
+          name: "assistent",
+          type: "tool",
+          x: 1300,
+          y: 50,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "youtubeTool",
+          name: "YouTube",
+          type: "tool",
+          x: 1300,
+          y: 120,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "callN8nTool",
+          name: "Call n8n Workflow Tool",
+          type: "tool",
+          x: 1300,
+          y: 190,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "telegramTool",
+          name: "Telegram",
+          type: "tool",
+          x: 1300,
+          y: 260,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "gmailTool",
+          name: "Gmail",
+          type: "tool",
+          x: 1300,
+          y: 330,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "dropbox",
+          name: "Dropbox",
+          type: "tool",
+          x: 1300,
+          y: 400,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "stripe",
+          name: "Stripe",
+          type: "tool",
+          x: 1300,
+          y: 470,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "webflow",
+          name: "Webflow",
+          type: "tool",
+          x: 1300,
+          y: 540,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool1",
+          name: "AI Agent Tool1",
+          type: "tool",
+          x: 1500,
+          y: 50,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool2",
+          name: "AI Agent Tool2",
+          type: "tool",
+          x: 1500,
+          y: 120,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool3",
+          name: "AI Agent Tool3",
+          type: "tool",
+          x: 1500,
+          y: 190,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool4",
+          name: "AI Agent Tool4",
+          type: "tool",
+          x: 1500,
+          y: 260,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool5",
+          name: "AI Agent Tool5",
+          type: "tool",
+          x: 1500,
+          y: 330,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool6",
+          name: "AI Agent Tool6",
+          type: "tool",
+          x: 1500,
+          y: 400,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool7",
+          name: "AI Agent Tool7",
+          type: "tool",
+          x: 1500,
+          y: 470,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool8",
+          name: "AI Agent Tool8",
+          type: "tool",
+          x: 1500,
+          y: 540,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool9",
+          name: "AI Agent Tool9",
+          type: "tool",
+          x: 1500,
+          y: 610,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool10",
+          name: "AI Agent Tool10",
+          type: "tool",
+          x: 1500,
+          y: 680,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool11",
+          name: "AI Agent Tool11",
+          type: "tool",
+          x: 1500,
+          y: 750,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "aiAgentTool12",
+          name: "AI Agent Tool12",
+          type: "tool",
+          x: 1500,
+          y: 820,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "googleSheets",
+          name: "Google Sheets",
+          type: "output",
+          x: 1700,
+          y: 100,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "httpRequest",
+          name: "HTTP Request",
+          type: "tool",
+          x: 1700,
+          y: 200,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "ifNode",
+          name: "If",
+          type: "tool",
+          x: 1700,
+          y: 300,
+          width: 120,
+          height: 50,
+        },
+        {
+          id: "openaiChat",
+          name: "OpenAI Chat Model",
+          type: "tool",
+          x: 1700,
+          y: 400,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "mistralChat",
+          name: "Mistral Cloud Chat Model",
+          type: "tool",
+          x: 1700,
+          y: 500,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "ollamaChat",
+          name: "Ollama Chat Model",
+          type: "tool",
+          x: 1700,
+          y: 600,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "grokChat",
+          name: "xAI Grok Chat Model",
+          type: "tool",
+          x: 1700,
+          y: 700,
+          width: 170,
+          height: 50,
+        },
+        {
+          id: "chatMemoryManager",
+          name: "Chat Memory Manager",
+          type: "tool",
+          x: 1100,
+          y: 600,
+          width: 200,
+          height: 50,
+        },
+        {
+          id: "getAnItem",
+          name: "Get an item",
+          type: "tool",
+          x: 1300,
+          y: 610,
+          width: 150,
+          height: 50,
+        },
+        {
+          id: "getACharge",
+          name: "Get a charge",
+          type: "tool",
+          x: 1300,
+          y: 680,
+          width: 150,
+          height: 50,
+        },
+      ];
+
+      // Connection definitions (fromNodeId, toNodeId)
+      const connections = [
+        // MPA Flow Connections
+        ["scheduleTriggerMPA", "masterAssistant"],
+        ["telegramTriggerMPA", "masterAssistant"],
+        ["masterAssistant", "getemail"],
+        ["masterAssistant", "googlecalendar"],
+        ["masterAssistant", "transcribeAudio"],
+        ["masterAssistant", "startFactory"],
+        ["masterAssistant", "replyTelegram"],
+        ["masterAssistant", "slack"],
+
+        // Connection between the two workflows
+        ["startFactory", "mcpTrigger"],
+
+        // Factory Flow Connections
+        ["mcpTrigger", "interpreter"],
+        ["mcpTrigger", "qualityControl"],
+        ["mcpTrigger", "superAgentManager"],
+        ["manualTriggerFactory", "interpreter"],
+        ["interpreter", "assistent"],
+        ["qualityControl", "youtubeTool"],
+        ["qualityControl", "callN8nTool"],
+        ["qualityControl", "telegramTool"],
+        ["qualityControl", "gmailTool"],
+        ["qualityControl", "dropbox"],
+        ["qualityControl", "stripe"],
+        ["qualityControl", "webflow"],
+        ["superAgentManager", "aiAgentTool1"],
+        ["superAgentManager", "aiAgentTool2"],
+        ["superAgentManager", "aiAgentTool3"],
+        ["superAgentManager", "aiAgentTool4"],
+        ["superAgentManager", "aiAgentTool5"],
+        ["superAgentManager", "aiAgentTool6"],
+        ["superAgentManager", "aiAgentTool7"],
+        ["superAgentManager", "aiAgentTool8"],
+        ["superAgentManager", "aiAgentTool9"],
+        ["superAgentManager", "aiAgentTool10"],
+        ["superAgentManager", "aiAgentTool11"],
+        ["superAgentManager", "aiAgentTool12"],
+        ["telegramTool", "googleSheets"],
+        ["telegramTool", "httpRequest"],
+        ["telegramTool", "ifNode"],
+        ["interpreter", "ollamaChat"],
+        ["qualityControl", "openaiChat"],
+        ["superAgentManager", "mistralChat"],
+        ["superAgentManager", "grokChat"],
+        ["getAnItem", "interpreter"],
+        ["getACharge", "interpreter"],
+        ["chatMemoryManager", "interpreter"],
+      ];
+
+      // Node color map
+      const nodeColors = {
+        trigger: { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af" },
+        agent: { bg: "#fefcbf", border: "#fcd34d", text: "#b45309" },
+        tool: { bg: "#d1fae5", border: "#34d399", text: "#065f46" },
+        output: { bg: "#f3e8ff", border: "#c084fc", text: "#7e22ce" },
+      };
+
+      function draw() {
+        // Set canvas dimensions
+        const parent = canvas.parentElement;
+        canvas.width = 3000;
+        canvas.height = 2000;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.scale(scale, scale);
+
+        // Draw connections first so they are behind the nodes
+        ctx.strokeStyle = "#4b5563";
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+
+        connections.forEach(([fromId, toId]) => {
+          const fromNode = nodes.find((n) => n.id === fromId);
+          const toNode = nodes.find((n) => n.id === toId);
+
+          if (fromNode && toNode) {
+            ctx.beginPath();
+            ctx.moveTo(
+              fromNode.x + fromNode.width / 2,
+              fromNode.y + fromNode.height / 2
+            );
+            ctx.lineTo(
+              toNode.x + toNode.width / 2,
+              toNode.y + toNode.height / 2
+            );
+            ctx.stroke();
+          }
+        });
+
+        // Draw nodes
+        nodes.forEach((node) => {
+          const colors = nodeColors[node.type];
+
+          // Draw node rectangle
+          ctx.fillStyle = colors.bg;
+          ctx.strokeStyle = colors.border;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(node.x, node.y, node.width, node.height, 8);
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw node text
+          ctx.fillStyle = colors.text;
+          ctx.font = "14px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(
+            node.name,
+            node.x + node.width / 2,
+            node.y + node.height / 2
+          );
+        });
+
+        ctx.restore();
+      }
+
+      // Mouse event handlers for interactivity
+      canvas.addEventListener("mousedown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) / scale;
+        const mouseY = (e.clientY - rect.top) / scale;
+
+        draggedNode = nodes.find(
+          (node) =>
+            mouseX >= node.x &&
+            mouseX <= node.x + node.width &&
+            mouseY >= node.y &&
+            mouseY <= node.y + node.height
+        );
+        if (draggedNode) {
+          isDragging = true;
+          offsetX = mouseX - draggedNode.x;
+          offsetY = mouseY - draggedNode.y;
+          canvas.style.cursor = "grabbing";
+        }
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (isDragging) {
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = (e.clientX - rect.left) / scale;
+          const mouseY = (e.clientY - rect.top) / scale;
+          draggedNode.x = mouseX - offsetX;
+          draggedNode.y = mouseY - offsetY;
+          draw();
+        } else {
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = (e.clientX - rect.left) / scale;
+          const mouseY = (e.clientY - rect.top) / scale;
+          const hoverNode = nodes.find(
+            (node) =>
+              mouseX >= node.x &&
+              mouseX <= node.x + node.width &&
+              mouseY >= node.y &&
+              mouseY <= node.y + node.height
+          );
+          canvas.style.cursor = hoverNode ? "grab" : "default";
+        }
+      });
+
+      canvas.addEventListener("mouseup", () => {
+        isDragging = false;
+        draggedNode = null;
+        canvas.style.cursor = "default";
+      });
+
+      // Add zoom functionality
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
+        const newScale = Math.max(0.2, Math.min(2.0, scale * zoomDelta));
+
+        if (newScale !== scale) {
+          scale = newScale;
+          draw();
+        }
+      });
+
+      // Initial draw and redraw on resize
+      window.addEventListener("load", draw);
+      window.addEventListener("resize", draw);
+    </script>
+  </body>
+</html>
