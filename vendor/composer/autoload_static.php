@@ -9,14 +9,21 @@ class ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964
     public static $files = array (
         '7b11c4dc42b3b3023073cb14e519683c' => __DIR__ . '/..' . '/ralouphie/getallheaders/src/getallheaders.php',
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
+        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
         '37a3dc5111fe8f707ab4c132ef1dbc62' => __DIR__ . '/..' . '/guzzlehttp/guzzle/src/functions_include.php',
     );
 
     public static $prefixLengthsPsr4 = array (
+        'S' => 
+        array (
+            'Symfony\\Polyfill\\Mbstring\\' => 26,
+        ),
         'P' => 
         array (
             'Psr\\Http\\Message\\' => 17,
             'Psr\\Http\\Client\\' => 16,
+            'PhpOffice\\PhpWord\\' => 18,
+            'PhpOffice\\Math\\' => 15,
         ),
         'G' => 
         array (
@@ -27,6 +34,10 @@ class ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964
     );
 
     public static $prefixDirsPsr4 = array (
+        'Symfony\\Polyfill\\Mbstring\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
+        ),
         'Psr\\Http\\Message\\' => 
         array (
             0 => __DIR__ . '/..' . '/psr/http-factory/src',
@@ -35,6 +46,14 @@ class ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964
         'Psr\\Http\\Client\\' => 
         array (
             0 => __DIR__ . '/..' . '/psr/http-client/src',
+        ),
+        'PhpOffice\\PhpWord\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phpoffice/phpword/src/PhpWord',
+        ),
+        'PhpOffice\\Math\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phpoffice/math/src/Math',
         ),
         'GuzzleHttp\\Psr7\\' => 
         array (
@@ -50,6 +69,16 @@ class ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964
         ),
     );
 
+    public static $prefixesPsr0 = array (
+        'S' => 
+        array (
+            'Smalot\\PdfParser\\' => 
+            array (
+                0 => __DIR__ . '/..' . '/smalot/pdfparser/src',
+            ),
+        ),
+    );
+
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
     );
@@ -59,6 +88,7 @@ class ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964
         return \Closure::bind(function () use ($loader) {
             $loader->prefixLengthsPsr4 = ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964::$prefixLengthsPsr4;
             $loader->prefixDirsPsr4 = ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964::$prefixesPsr0;
             $loader->classMap = ComposerStaticInit4b55c7ef33235a0353c1b6b079f86964::$classMap;
 
         }, null, ClassLoader::class);

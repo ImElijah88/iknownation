@@ -18,9 +18,15 @@
         </div>
     </a>
 
+    <div class="w-full px-3 mb-4">
+        <input type="text" id="search-presentations" class="w-full p-2 border border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 rounded-lg" placeholder="Search presentations...">
+    </div>
+
     <!-- Dynamic Menu Items -->
     <!-- This div will be populated by nownation.js with presentation links -->
     <div id="sidebar-menu" class="w-full space-y-2"></div>
+
+    <div id="pagination-controls" class="w-full flex justify-center items-center mt-4"></div>
 
     <!-- User-specific Controls -->
     <!-- The '+' button for logged-in users will be injected here by JavaScript -->

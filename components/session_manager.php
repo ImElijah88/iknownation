@@ -57,7 +57,7 @@ function checkAndLoginFromCookie() {
                     $cookie_name = 'remember_me_token';
                     $cookie_value = $user['id'] . ':' . $new_token;
                     $cookie_expiry = time() + (86400 * 30);
-                    setcookie($cookie_name, $cookie_value, $cookie_expiry, "/", "", false, true);
+                    setcookie($cookie_name, $cookie_value, ['expires' => $cookie_expiry, 'path' => '/', 'samesite' => 'Strict', 'secure' => true, 'httponly' => true]);
 
                 } else {
                     // Token has expired, clear it from the database and the cookie
@@ -89,13 +89,25 @@ function isLoggedIn(): bool
 }
 
 /**
+ * @deprecated Use hasRole('admin') instead.
  * Checks if the logged-in user is an administrator.
  *
  * @return bool True if the user is an admin, false otherwise.
  */
 function isAdmin(): bool
 {
-    return isLoggedIn() && isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin';
+    return hasRole('admin');
+}
+
+/**
+ * Checks if the logged-in user has a specific role.
+ *
+ * @param string $role The role to check for.
+ * @return bool True if the user has the specified role, false otherwise.
+ */
+function hasRole(string $role): bool
+{
+    return isLoggedIn() && isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === $role;
 }
 
 /**
@@ -129,6 +141,7 @@ function loginUser(array $user): void
     }
 
     $_SESSION['user'] = $user;
+    session_regenerate_id(true);
 }
 
 /**
@@ -148,7 +161,7 @@ function logoutUser(): void
     
     // Also destroy the remember me cookie
     if (isset($_COOKIE['remember_me_token'])) {
-        setcookie('remember_me_token', '', time() - 3600, "/");
+        setcookie('remember_me_token', '', ['expires' => time() - 3600, 'path' => '/', 'samesite' => 'Strict', 'secure' => true, 'httponly' => true]);
     }
 
     session_destroy();

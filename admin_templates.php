@@ -3,7 +3,7 @@
 require_once 'components/session_manager.php';
 
 // If the user is not an admin, redirect them to the main page.
-if (!isAdmin()) {
+if (!hasRole('admin')) {
     header("Location: nownation.php");
     exit;
 }

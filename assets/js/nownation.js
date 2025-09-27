@@ -4,6 +4,15 @@
  * This script controls all the dynamic functionality on nownation.php.
  */
 
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     // --- GLOBAL STATE ---
     let allPresentations = {};
@@ -11,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let activePresentationId = null;
     const currentUser = APP_USER;
     const storageKey = `nownation_sidemenu_${currentUser ? currentUser.id : 'guest'}`;
+
+    let currentPage = 1;
+    const limit = 10;
+    let totalPresentations = 0;
 
     // --- DOM ELEMENTS ---
     const sidebarMenu = document.getElementById("sidebar-menu");
@@ -23,22 +36,63 @@ document.addEventListener("DOMContentLoaded", () => {
     const sidebar = document.getElementById('sidebar');
     const hoverTrigger = document.getElementById('sidebar-hover-trigger');
 
+    const searchInput = document.getElementById('search-presentations');
+
     // --- SIDEBAR HOVER LOGIC ---
     if (hoverTrigger && sidebar) {
         hoverTrigger.addEventListener("mouseenter", () => sidebar.classList.add("open"));
         sidebar.addEventListener("mouseleave", () => sidebar.classList.remove("open"));
     }
 
+    function filterAndRenderSidemenu() {
+        const searchTerm = searchInput.value.toLowerCase();
+        if (searchTerm === '') {
+            renderSidemenu();
+            return;
+        }
+        const filteredKeys = sidemenuKeys.filter(key => {
+            const presentation = allPresentations[key];
+            return presentation && presentation.title.toLowerCase().includes(searchTerm);
+        });
+        renderSidemenu(filteredKeys);
+    }
+
+    function renderPagination() {
+        const paginationControls = document.getElementById('pagination-controls');
+        paginationControls.innerHTML = '';
+        const totalPages = Math.ceil(totalPresentations / limit);
+
+        if (totalPages <= 1) {
+            return;
+        }
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageLink = document.createElement('button');
+            pageLink.textContent = i;
+            pageLink.className = `px-3 py-1 mx-1 rounded-lg ${i === currentPage ? 'bg-cyan-500 text-white' : 'bg-black/10 dark:bg-white/10'}`;
+            pageLink.addEventListener('click', () => {
+                currentPage = i;
+                initialize();
+            });
+            paginationControls.appendChild(pageLink);
+        }
+    }
+
     // --- INITIALIZATION ---
     async function initialize() {
         try {
-            const response = await fetch('api/get_presentations.php');
+            const response = await fetch(`api/get_presentations.php?page=${currentPage}&limit=${limit}`);
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            allPresentations = await response.json();
+            const data = await response.json();
+            allPresentations = data.presentations;
+            totalPresentations = data.total_presentations;
             
             loadSidemenuState();
             updateUIForUser();
             renderSidemenu();
+            renderPagination();
+
+            searchInput.addEventListener('input', filterAndRenderSidemenu);
 
             const urlParams = new URLSearchParams(window.location.search);
             const presentationKeyFromUrl = urlParams.get('presentation');
@@ -81,12 +135,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (currentUser) {
             authContainer.innerHTML = `
                 <div class="flex items-center space-x-2">
-                     <a href="my_profile.php" class="px-3 py-2 text-sm font-semibold text-white rounded-lg" style="background-color: var(--primary-color)">My Profile</a>
                     <a href="logout.php" class="px-3 py-2 text-sm font-semibold text-white rounded-lg" style="background-color: var(--primary-color-hover)">Logout</a>
                 </div>
             `;
             // '+' button in sidebar
             userAddControls.innerHTML = `
+                <a href="my_profile.php" class="w-full flex items-center p-3 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    <span class="font-semibold ml-3">My Profile</span>
+                </a>
+                <a href="leaderboard.php" class="w-full flex items-center p-3 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
+                    <span class="font-semibold ml-3">Leaderboard</span>
+                </a>
                 <button id="add-presentation-btn" class="w-full flex items-center p-3 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                     <span class="font-semibold ml-3">Add Presentation</span>
@@ -101,9 +162,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function renderSidemenu() {
+    function renderSidemenu(keysToRender = sidemenuKeys) {
         sidebarMenu.innerHTML = '';
-        sidemenuKeys.forEach(key => {
+        keysToRender.forEach(key => {
             if (allPresentations[key]) {
                 const link = createSidemenuLink(allPresentations[key]);
                 sidebarMenu.appendChild(link);
@@ -203,8 +264,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function switchPresentation(presentationId) {
+        const exportControls = document.getElementById('export-controls');
         if (!presentationId || !allPresentations[presentationId]) {
             presentationWrapper.innerHTML = '';
+            exportControls.innerHTML = '';
             return;
         }
         activePresentationId = presentationId;
@@ -216,6 +279,15 @@ document.addEventListener("DOMContentLoaded", () => {
         document.documentElement.style.setProperty("--primary-color", colors.primary);
         document.documentElement.style.setProperty("--primary-color-light", colors.light);
         document.documentElement.style.setProperty("--primary-color-hover", colors.hover);
+
+        // Populate export controls
+        exportControls.innerHTML = `
+            <div class="flex justify-around">
+                <a href="api/export.php?presentation_id=${presentationData.id}&format=html" target="_blank" class="px-3 py-2 text-sm font-semibold text-white rounded-lg" style="background-color: var(--primary-color)">Export HTML</a>
+                <a href="api/export.php?presentation_id=${presentationData.id}&format=txt" target="_blank" class="px-3 py-2 text-sm font-semibold text-white rounded-lg" style="background-color: var(--primary-color)">Export TXT</a>
+            </div>
+        `;
+
         renderPresentation(presentationData);
     }
 
@@ -264,6 +336,28 @@ document.addEventListener("DOMContentLoaded", () => {
         const quizOptionsEl = document.getElementById("quiz-options");
         const quizFeedbackEl = document.getElementById("quiz-feedback");
 
+        const debouncedSaveProgress = debounce(saveProgress, 1000);
+
+        async function saveProgress(presentationKey, slide, xp) {
+            if (!currentUser) return;
+
+            try {
+                await fetch('api/save_progress.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        presentation_key: presentationKey,
+                        current_slide: slide,
+                        xp: xp
+                    })
+                });
+            } catch (error) {
+                console.error("Failed to save progress:", error);
+            }
+        }
+
         function updateSlide() {
             const isStarted = currentSlide > 0;
             headerEl.classList.toggle("hidden", !isStarted);
@@ -281,6 +375,8 @@ document.addEventListener("DOMContentLoaded", () => {
               finalXpScoreEl.textContent = xpScore;
             }
             if(xpScoreEl) xpScoreEl.textContent = xpScore;
+
+            debouncedSaveProgress(activePresentationId, currentSlide, xpScore);
         }
 
         function showQuiz(quiz) {

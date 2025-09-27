@@ -20,8 +20,8 @@ This document outlines the current issues and unimplemented features that need t
 
 ✅ 5.  **Admin Template Management JavaScript** - Completed 2025-09-21
 
-6.  **File Content Extraction for Non-`.txt` Files**
-    *   **Description:** `api/generate_presentation.php` currently only processes `.txt` files for LLM input. Support for `.pdf`, `.doc`, `.docx` is a placeholder.
-    *   **Action Needed:** Integrate PHP libraries for advanced content extraction.
+✅ 6.  **File Content Extraction for Non-`.txt` Files** - Completed 2025-09-27
+    *   **Description:** `api/generate_presentation.php` now processes `.txt`, `.pdf`, `.doc`, and `.docx` files.
+    *   **Action Needed:** Integration of PHP libraries for content extraction is complete.
 
 ✅ 7.  **"Remember Me" and "Forgot Password" Backend** - Completed 2025-09-21

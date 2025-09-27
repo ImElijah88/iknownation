@@ -12,7 +12,7 @@ require_once '../components/session_manager.php';
 $response = ['status' => 'error', 'message' => 'Invalid Request'];
 
 // --- Security Check ---
-if (!isAdmin()) {
+if (!hasRole('admin')) {
     $response['message'] = 'You do not have permission to delete templates.';
     http_response_code(403);
     echo json_encode($response);

@@ -35,7 +35,7 @@ Export Logic: When a presentation is active, populate the #export-controls conta
 
 ### Future Improvements:
 
-*   **Implement Export Logic:** Integrate the export functionality (buttons in `#export-controls`) once `api/export.php` is ready.
-*   **Presentation Progress Saving:** Implement saving user's progress (current slide, XP) to the database.
-*   **Gamification Features:** Expand on XP and badges, potentially adding leaderboards or more complex gamified elements.
-*   **Search/Filter Presentations:** Add search and filter capabilities for presentations in the sidemenu.
+✅ **Implement Export Logic:** Integrated the export functionality (buttons in `#export-controls`).
+✅ **Presentation Progress Saving:** Implement saving user's progress (current slide, XP) to the database.
+✅ **Gamification Features:** Expanded on XP and badges by implementing a leaderboard.
+✅ **Search/Filter Presentations:** Added search and filter capabilities for presentations in the sidemenu.

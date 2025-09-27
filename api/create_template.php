@@ -12,7 +12,7 @@ require_once '../components/session_manager.php';
 $response = ['status' => 'error', 'message' => 'Invalid Request'];
 
 // --- Security Check ---
-if (!isAdmin()) {
+if (!hasRole('admin')) {
     $response['message'] = 'You do not have permission to create templates.';
     echo json_encode($response);
     exit;

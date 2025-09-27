@@ -138,6 +138,30 @@ async def cleanup_mcp():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@flask_app.route('/llm/completion', methods=['POST'])
+async def llm_completion():
+    try:
+        print("[DEBUG] Received request on /llm/completion")
+        prompt = request.json.get('prompt')
+        if not prompt:
+            return jsonify({"error": "prompt missing"}), 400
+
+        completion = mcp_client.openai.chat.completions.create(
+            model="mistralai/mixtral-8x7b-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+        )
+
+        print("[DEBUG] /llm/completion request handled successfully.")
+        return jsonify({"status": "success", "result": completion.choices[0].message.content})
+    except Exception as e:
+        print(f"[ERROR] An error occurred in llm_completion: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # Now, create the 'app' variable that Uvicorn uses by wrapping the Flask app
 app = WsgiToAsgi(flask_app)
 

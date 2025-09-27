@@ -14,10 +14,7 @@ class Neo
     public function __construct($conn)
     {
         $this->conn = $conn;
-        $this->llmApiKey = LLM_API_KEY; // Defined in db_config.php
-        $this->llmEndpoint = 'https://openrouter.ai/api/v1/chat/completions'; // Your LLM API Endpoint
-        $this->llmModel = 'mistralai/mixtral-8x7b-instruct'; // Your LLM Model
-        $this->mpvServerUrl = 'http://localhost:8000'; // Example MPV server URL
+        $this->mpvServerUrl = 'http://localhost:5001'; // mcp_bridge server URL
     }
 
     /**
@@ -86,30 +83,18 @@ class Neo
      */
     private function callLlmApi(string $prompt): string
     {
-        $ch = curl_init($this->llmEndpoint);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-            'prompt' => $prompt,
-            'max_tokens' => 2000, // Adjust as needed
-            'temperature' => 0.7,
-            'model' => $this->llmModel
-        ]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->llmApiKey
+        $client = new \GuzzleHttp\Client();
+        $response = $client->post($this->mpvServerUrl . '/llm/completion', [
+            'json' => [
+                'prompt' => $prompt
+            ]
         ]);
 
-        $llmResponse = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($llmResponse === false || $httpCode !== 200) {
-            throw new Exception('LLM API call failed: ' . ($curlError ? $curlError : 'HTTP Error ' . $httpCode . ': ' . $llmResponse));
+        if ($response->getStatusCode() !== 200) {
+            throw new Exception('MCP Bridge API call failed: HTTP Error ' . $response->getStatusCode() . ': ' . $response->getBody());
         }
 
-        return $llmResponse;
+        return $response->getBody()->getContents();
     }
 
     /**
@@ -120,15 +105,14 @@ class Neo
         $llmOutput = json_decode($llmResponse, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('Failed to decode LLM response: ' . json_last_error_msg() . '. Response: ' . $llmResponse);
+            throw new Exception('Failed to decode MCP Bridge response: ' . json_last_error_msg() . '. Response: ' . $llmResponse);
         }
 
-        // Extract the generated text from the LLM's response based on OpenRouter's chat completions format
         $generatedText = '';
-        if (isset($llmOutput['choices'][0]['message']['content'])) {
-            $generatedText = $llmOutput['choices'][0]['message']['content'];
+        if (isset($llmOutput['result'])) {
+            $generatedText = $llmOutput['result'];
         } else {
-            throw new Exception('LLM response did not contain expected content (missing choices[0][message][content]). Response: ' . $llmResponse);
+            throw new Exception('MCP Bridge response did not contain expected content (missing result). Response: ' . $llmResponse);
         }
 
         // Attempt to extract JSON from the LLM's response, in case it includes conversational filler
@@ -156,13 +140,39 @@ class Neo
      */
     public function extractFileContent(string $filePath, string $fileExtension): string
     {
-        if ($fileExtension === 'txt') {
-            return file_get_contents($filePath);
-        } else {
-            // In a real scenario, this would call your MPV server.
-            // Example: curl to http://localhost:8000/extract_text with file path
-            // For now, it returns a placeholder message.
-            return "Content extraction for ." . $fileExtension . " files is not yet implemented via MPV. Using placeholder.";
+        switch ($fileExtension) {
+            case 'txt':
+                return file_get_contents($filePath);
+            case 'pdf':
+                try {
+                    $parser = new \Smalot\PdfParser\Parser();
+                    $pdf = $parser->parseFile($filePath);
+                    return $pdf->getText();
+                } catch (Exception $e) {
+                    throw new Exception("Failed to extract PDF content: " . $e->getMessage());
+                }
+            case 'doc':
+            case 'docx':
+                try {
+                    $phpWord = \PhpOffice\PhpWord\IOFactory::load($filePath);
+                    $text = '';
+                    foreach ($phpWord->getSections() as $section) {
+                        foreach ($section->getElements() as $element) {
+                            if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+                                foreach ($element->getElements() as $textElement) {
+                                    if ($textElement instanceof \PhpOffice\PhpWord\Element\Text) {
+                                        $text .= $textElement->getText() . ' ';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return $text;
+                } catch (Exception $e) {
+                    throw new Exception("Failed to extract Word document content: " . $e->getMessage());
+                }
+            default:
+                return "Unsupported file type: ." . $fileExtension;
         }
     }
 }
