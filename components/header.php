@@ -46,15 +46,15 @@ require_once 'components/session_manager.php';
     <!-- MODALS -->
 
     <!-- Login/Register Modal -->
-    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
         <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl shadow-xl p-8 max-w-sm w-full relative">
-            <button id="close-login-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+            <button id="close-login-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200" aria-label="Close login modal">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
 
             <!-- Login View -->
             <div id="login-view">
-                <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
+                <h2 id="login-modal-title" class="text-2xl font-bold mb-6 text-center">Login</h2>
                 <form id="login-form">
                     <div class="mb-4">
                         <label for="email" class="block mb-2 text-sm font-medium">Email</label>
@@ -118,8 +118,22 @@ require_once 'components/session_manager.php';
     </div>
 
     <!-- Profile Modal -->
-    <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
-        <!-- Content will be added in a future step -->
+    <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl shadow-xl p-8 max-w-sm w-full relative">
+            <button id="close-profile-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200" aria-label="Close profile modal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h2 id="profile-modal-title" class="text-2xl font-bold mb-6 text-center">My Profile</h2>
+            <div class="space-y-4">
+                <p class="text-lg">Total XP: <span id="profile-total-xp" class="font-semibold">0</span></p>
+                <div>
+                    <p class="text-lg mb-2">Badges:</p>
+                    <div id="profile-badges" class="flex flex-wrap gap-2">
+                        <!-- Badges will be loaded here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Notification Element -->

@@ -16,11 +16,9 @@ if (session_status() == PHP_SESSION_NONE) {
  * Checks for a "Remember Me" cookie and logs the user in if valid.
  * This should be called on pages that require user authentication.
  */
-function checkAndLoginFromCookie() {
+function checkAndLoginFromCookie($conn) {
     // Only proceed if the user is not already logged in via session
     if (!isLoggedIn() && isset($_COOKIE['remember_me_token'])) {
-        // The database connection is needed for this operation
-        require_once __DIR__ . '/../config/db_config.php';
         
         list($user_id, $token) = explode(':', $_COOKIE['remember_me_token'], 2);
 
@@ -75,7 +73,7 @@ function checkAndLoginFromCookie() {
 }
 
 // Automatically check for the remember me cookie on script load
-checkAndLoginFromCookie();
+checkAndLoginFromCookie($conn);
 
 
 /**

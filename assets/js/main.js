@@ -83,7 +83,44 @@ document.addEventListener("DOMContentLoaded", () => {
     // Function to open a modal
     window.openModal = function(modalId) {
         const modal = document.getElementById(modalId);
-        if(modal) modal.classList.remove('hidden');
+        if(modal) {
+            modal.classList.remove('hidden');
+            if (modalId === 'profile-modal') {
+                fetchAndPopulateProfileModal();
+            }
+        }
+    }
+
+    async function fetchAndPopulateProfileModal() {
+        const profileTotalXpEl = document.getElementById('profile-total-xp');
+        const profileBadgesEl = document.getElementById('profile-badges');
+
+        if (!profileTotalXpEl || !profileBadgesEl) return;
+
+        profileTotalXpEl.textContent = 'Loading...';
+        profileBadgesEl.innerHTML = '';
+
+        try {
+            const response = await fetch('api/get_user_data.php');
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                profileTotalXpEl.textContent = data.user.total_xp;
+                if (data.user.badges && data.user.badges.length > 0) {
+                    profileBadgesEl.innerHTML = data.user.badges.map(badge => `<span class="badge">${badge}</span>`).join('');
+                } else {
+                    profileBadgesEl.textContent = 'No badges yet.';
+                }
+            } else {
+                profileTotalXpEl.textContent = 'Error loading data.';
+                window.showNotification(data.message, 'error');
+            }
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            profileTotalXpEl.textContent = 'Error loading data.';
+            window.showNotification('An error occurred while fetching profile data.', 'error');
+        }
     }
 
     // Function to close a modal
